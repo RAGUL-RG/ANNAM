@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /donation_images/{donorId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.auth.uid == donorId
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /delivery_proofs/{volunteerId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.auth.uid == volunteerId
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isDonationDonor() {
+      return signedIn() && resource.data.donorId == request.auth.uid;
+    }
+
+    function isAssignedVolunteer() {
+      return signedIn() && resource.data.volunteerId == request.auth.uid;
+    }
+
+    function donorFieldsAreLocked() {
+      return request.resource.data.donorId == resource.data.donorId
+        && request.resource.data.donationId == resource.data.donationId;
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(fields);
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /donations/{donationId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.donationId == donationId
+        && request.resource.data.donorId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow update: if signedIn()
+        && (
+          (
+            isDonationDonor()
+            && donorFieldsAreLocked()
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'pending'
+            && changedOnly([
+              'image',
+              'description',
+              'quantity',
+              'location',
+              'pickupTime',
+              'phoneNumber',
+              'timestamp'
+            ])
+          )
+          || (
+            resource.data.status == 'pending'
+            && request.resource.data.status == 'accepted'
+            && request.resource.data.volunteerId == request.auth.uid
+            && donorFieldsAreLocked()
+            && changedOnly(['status', 'volunteerId', 'acceptedAt'])
+          )
+          || (
+            isAssignedVolunteer()
+            && resource.data.status == 'accepted'
+            && request.resource.data.status == 'picked'
+            && donorFieldsAreLocked()
+            && request.resource.data.volunteerId == request.auth.uid
+            && changedOnly(['status', 'pickedAt'])
+          )
+          || (
+            isAssignedVolunteer()
+            && resource.data.status == 'picked'
+            && request.resource.data.status == 'delivered'
+            && donorFieldsAreLocked()
+            && request.resource.data.volunteerId == request.auth.uid
+            && request.resource.data.proofImage is string
+            && request.resource.data.deliveryNotes is string
+            && changedOnly([
+              'status',
+              'proofImage',
+              'deliveryNotes',
+              'deliveredAt'
+            ])
+          )
+        );
+
+      allow delete: if isDonationDonor()
+        && resource.data.status == 'pending';
+    }
+  }
+}

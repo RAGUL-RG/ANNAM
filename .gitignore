@@ -1,0 +1,17 @@
+.dart_tool/
+.flutter-sdk/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+firebase_app_id_file.json
+functions/node_modules/
+functions/.env
+functions/lib/
+
+*.iml
+.idea/
+.vscode/
